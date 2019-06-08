@@ -1,43 +1,85 @@
-/* Contador de palavras
- *
- * Este programa recebera uma serie de caracteres representando palavras em sua
- * entrada. Ao receber um caractere fim de linha ('\n'), deve imprimir na tela o
- * numero de palavras separadas que recebeu e, apos, encerrar.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
 
 void merge_sort(int* array, int begin, int end);
 void merge(int* array, int begin, int middle, int end);
 void get_inputs(int inputs[], int* number_of_inputs);
+void* sorter_routine(void* args);
+
+#define MAX_THREADS 4
+
+typedef struct sorter {
+    pthread_t thread_id;
+    int index;
+    int begin;
+    int end;
+} sorter_t;
+
+int array[100000];
+
+void* sorter_routine(void* args) {
+    sorter_t sorter = *((sorter_t*) args);
+
+    merge_sort(array, sorter.begin, sorter.end);
+}
 
 int main() {
 
-  int x, y;
-
-    int array[100000];
     int number_of_elements;
+    int number_of_threads;
+    sorter_t* sorters;
+    int thread_range;
     
     get_inputs(array, &number_of_elements);
-    
 
-    merge_sort(array, 0, number_of_elements - 1);
+    if (number_of_elements < MAX_THREADS) {
+        number_of_threads = number_of_elements;
+    }
+    else {
+        number_of_threads = MAX_THREADS;
+    }
     
-    number_of_elements--;
+    sorters = (sorter_t*) malloc(number_of_threads * sizeof(sorter_t));
     
-    for (int index = 0; index < number_of_elements; index++) {
+    thread_range = number_of_elements / number_of_threads;
+    
+    for (int i = 0, begin = 0; i < number_of_threads; i++) {
+        sorters[i].index = i;
+        sorters[i].begin = begin;
+        begin += thread_range;
+        
+        if (i == number_of_threads - 1) {
+            sorters[i].end = number_of_elements - 1;
+        } else {
+            sorters[i].end = begin -1;
+        }
+
+        pthread_create(&(sorters[i].thread_id), NULL, sorter_routine, &(sorters[i]));
+    }
+   
+   for (int i = 0, begin = 0; i < number_of_threads; i++) {
+        pthread_join(sorters[i].thread_id, NULL);
+   }
+    
+    for (int i = 1, begin = 0; i < number_of_threads; i++) {
+        
+        merge(array, 0, sorters[i - 1].end, sorters[i].end);
+   }
+    
+    for (int index = 0, end = number_of_elements - 1; index < end; index++) {
 
         printf("%d ", array[index]);
     }
     
-    printf("%d\n", array[number_of_elements]);
+    printf("%d\n", array[number_of_elements - 1]);
     
     
   return 0;
 }
 void merge_sort(int* array, int begin, int end) {
-
+    
     int middle = (end + begin) / 2;   
      
     if (end - begin < 1) {
