@@ -1,11 +1,13 @@
+// Parallel merge sort program
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
 
-void merge_sort(int* array, int begin, int end);
-void merge(int* array, int begin, int middle, int end);
-void get_inputs(int inputs[], int* number_of_inputs);
+void merge_sort(int begin, int end);
+void merge(int begin, int middle, int end);
+void get_inputs(int* number_of_inputs);
 void* sorter_routine(void* args);
 
 #define MAX_THREADS 4
@@ -19,10 +21,12 @@ typedef struct sorter {
 
 int array[100000];
 
+/* This is the thread routine, it sorts the array region received.
+*/
 void* sorter_routine(void* args) {
     sorter_t sorter = *((sorter_t*) args);
 
-    merge_sort(array, sorter.begin, sorter.end);
+    merge_sort(sorter.begin, sorter.end);
 }
 
 int main() {
@@ -32,8 +36,10 @@ int main() {
     sorter_t* sorters;
     int thread_range;
     
-    get_inputs(array, &number_of_elements);
-
+    // read the array from the stardard input
+    get_inputs(&number_of_elements);
+    
+    // Calculate the thread number according to the number of elements
     if (number_of_elements < MAX_THREADS) {
         number_of_threads = number_of_elements;
     }
@@ -41,10 +47,13 @@ int main() {
         number_of_threads = MAX_THREADS;
     }
     
+    // Create a array of structs of thread information
     sorters = (sorter_t*) malloc(number_of_threads * sizeof(sorter_t));
     
+    // Calculates the number of elements to be sorted by each thread
     thread_range = number_of_elements / number_of_threads;
     
+    // Divide the array into segments for each thread to sort
     for (int i = 0, begin = 0; i < number_of_threads; i++) {
         sorters[i].index = i;
         sorters[i].begin = begin;
@@ -59,26 +68,27 @@ int main() {
         pthread_create(&(sorters[i].thread_id), NULL, sorter_routine, &(sorters[i]));
     }
    
-   for (int i = 0, begin = 0; i < number_of_threads; i++) {
+    // Wait until all the threads ends
+    for (int i = 0, begin = 0; i < number_of_threads; i++) {
         pthread_join(sorters[i].thread_id, NULL);
-   }
-    
-    for (int i = 1, begin = 0; i < number_of_threads; i++) {
-        
-        merge(array, 0, sorters[i - 1].end, sorters[i].end);
-   }
-    
-    for (int index = 0, end = number_of_elements - 1; index < end; index++) {
-
-        printf("%d ", array[index]);
     }
     
+    // Merge the ordered segments of each thread
+    for (int i = 1, begin = 0; i < number_of_threads; i++) {
+        merge(0, sorters[i - 1].end, sorters[i].end);
+    }
+    
+    // Print the ordered array
+    for (int index = 0, end = number_of_elements - 1; index < end; index++) {
+        printf("%d ", array[index]);
+    }
     printf("%d\n", array[number_of_elements - 1]);
     
-    
-  return 0;
+    return 0;
 }
-void merge_sort(int* array, int begin, int end) {
+
+/* Recursive merge sort algorithm */
+void merge_sort(int begin, int end) {
     
     int middle = (end + begin) / 2;   
      
@@ -86,14 +96,17 @@ void merge_sort(int* array, int begin, int end) {
         return;
     }
 
-    merge_sort(array, begin, middle);
-    merge_sort(array, middle + 1, end);   
-    merge(array, begin, middle, end);
+    merge_sort(begin, middle);
+    merge_sort(middle + 1, end);   
+    merge(begin, middle, end);
 }
 
-// array1 [begin...(middle-1)]
-// array2 [middle...end]
-void merge(int* array, int begin, int middle, int end) {
+/*
+    Sort an array, which is composed by two sorted segments.
+    array1 [begin...(middle-1)]
+    array2 [middle...end]
+*/
+void merge(int begin, int middle, int end) {
     int begin1 = begin;
     int begin2 = middle + 1;
     int size = end - begin + 1;
@@ -132,13 +145,13 @@ void merge(int* array, int begin, int middle, int end) {
 
 /* It gets the numbers from the standard input, one by one, 
    until the end of file character is found */
-void get_inputs(int inputs[], int* number_of_inputs) {
+void get_inputs(int* number_of_inputs) {
     
     int input;
     int index = 0;
     
     while (scanf("%d", &input) != EOF) {
-        inputs[index] = input;
+        array[index] = input;
         index++;
     }
     *number_of_inputs = index;
